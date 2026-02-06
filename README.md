@@ -4,6 +4,9 @@ A plugin for JADX to test Morphe-style fingerprints on-the-fly.
 
 ![Plugin usage](.github/images/usage.png)
 
+> [!WARNING]
+> Unique fingerprint generation is not yet implemented.
+
 Original codebase has been updated to support JADX 1.5.2+ and the Morphe API. All credit goes to [valonsdev](https://github.com/valonsodev/jadx-revanced) for the original work.
 
 ## Installation
@@ -18,9 +21,6 @@ Original codebase has been updated to support JADX 1.5.2+ and the Morphe API. Al
 1. Install from either:
    - local file: `jadx plugins --install-jar jadx-morphe.jar`
    - github release: `jadx plugins --install "github:hoo-dles:jadx-morphe"`
-
-> [!WARNING]
-> Unique fingerprint generation is not yet implemented.
 
 ## Building 
 
