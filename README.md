@@ -2,7 +2,7 @@
 
 A plugin for JADX to test Morphe-style fingerprints on-the-fly.
 
-[!Plugin usage](.github/images/usage.png)
+![Plugin usage](.github/images/usage.png)
 
 Original codebase has been updated to support JADX 1.5.2+ and the Morphe API. All credit goes to [valonsdev](https://github.com/valonsodev/jadx-revanced) for the original work.
 
