@@ -308,7 +308,7 @@ object MorpheFingerprintPluginUi {
             button.toolTipText = "Open Morphe Fingerprint Evaluator"
 
             button.addActionListener {
-                LOG.info { "Toolbar button clicked, showing UI." }
+                LOG.debug { "Toolbar button clicked, showing UI." }
                 if (fingerprintEvalFrame != null) {
                     fingerprintEvalFrame?.requestFocus()
                 } else {
@@ -420,7 +420,7 @@ object MorpheFingerprintPluginUi {
                 resultContentBox.repaint()
                 val script = codePanel.getText()
                 GlobalScope.launch(Dispatchers.IO) {
-                    LOG.info { "Evaluating script: $script" }
+                    LOG.debug { "Evaluating script: $script" }
                     var result: ResultWithDiagnostics<EvaluationResult>? = null
                     var evaluationError: Throwable? = null
                     val executionTime = measureTime {
@@ -499,9 +499,9 @@ object MorpheFingerprintPluginUi {
                                             ScriptEvaluation.LOG.error { "Actual value classloader: ${actualValue.javaClass.classLoader}" }
                                             ScriptEvaluation.LOG.error { "Expected Fingerprint classloader: ${Fingerprint::class.java.classLoader}" }
                                         } else {
-                                            ScriptEvaluation.LOG.info { "Index: $navigationIndex" }
-                                            ScriptEvaluation.LOG.info { "Current set: $matchedMethods" }
-                                            ScriptEvaluation.LOG.info { "Fingerprint: $actualValue" }
+//                                            ScriptEvaluation.LOG.info { "Index: $navigationIndex" }
+//                                            ScriptEvaluation.LOG.info { "Current set: $matchedMethods" }
+                                            ScriptEvaluation.LOG.debug { "Fingerprint: $actualValue" }
                                             outputBuilder.appendLine("Fingerprint: $actualValue")
 
                                             val searchResult = if (navigationIndex in matchedMethods.indices) {
@@ -545,10 +545,10 @@ object MorpheFingerprintPluginUi {
                                                     ScriptEvaluation.LOG.info { searchResultMsg }
                                                     val jumpButton = JButton("Jump to method")
                                                     jumpButton.addActionListener {
-                                                        ScriptEvaluation.LOG.info { "Jumping to method: ${sourceMethod.fullName}" }
+                                                        ScriptEvaluation.LOG.debug { "Jumping to method: ${sourceMethod.fullName}" }
                                                         val success = guiContext.open(sourceMethod.codeNodeRef)
                                                         if (success) {
-                                                            ScriptEvaluation.LOG.info { "Jumped to method: ${sourceMethod.fullName}" }
+                                                            ScriptEvaluation.LOG.debug { "Jumped to method: ${sourceMethod.fullName}" }
                                                         } else {
                                                             ScriptEvaluation.LOG.error { "Failed to jump to method: ${sourceMethod.fullName}" }
                                                             resultComponents.add(
@@ -596,7 +596,7 @@ object MorpheFingerprintPluginUi {
                         resultContentBox.repaint()
                         // Scroll to top if needed
                         resultScrollPane.verticalScrollBar.value = resultScrollPane.verticalScrollBar.minimum
-                        LOG.info { "Script evaluation UI updated." }
+                        LOG.debug { "Script evaluation UI updated." }
                     }
                 }
             }

@@ -52,9 +52,9 @@ object MorpheResolver {
             name = "Temporary patch for searching fingerprint"
         ) {
             execute {
-                ScriptEvaluation.LOG.info { "Inside execute" }
+                ScriptEvaluation.LOG.debug { "Inside execute" }
                 searchResult = fingerprint.originalMethodOrNull
-                ScriptEvaluation.LOG.info { "Fingerprint found: $searchResult" }
+                ScriptEvaluation.LOG.debug { "Fingerprint found: $searchResult" }
             }
 
         }
@@ -69,7 +69,7 @@ object MorpheResolver {
                 }
             }
         }
-        ScriptEvaluation.LOG.info { "Outside of block $searchResult" }
+        ScriptEvaluation.LOG.debug { "Outside of block $searchResult" }
 
         return searchResult
     }

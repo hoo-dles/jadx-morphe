@@ -34,12 +34,12 @@ object ScriptEvaluation {
     )
 
     init {
-        LOG.info { "Preloading BasicJvmScriptingHost..." }
+        LOG.debug { "Preloading BasicJvmScriptingHost..." }
         val execTime = measureTime {
             // This is a no-op, but it forces the BasicJvmScriptingHost to initialize
             rawEvaluate("")
         }
-        LOG.info { "Preloading done in ${execTime.inWholeMilliseconds.milliseconds}" }
+        LOG.debug { "Preloading done in ${execTime.inWholeMilliseconds.milliseconds}" }
     }
 
     fun rawEvaluate(string: String): ResultWithDiagnostics<EvaluationResult> {

@@ -25,8 +25,8 @@ class MorpheFingerprintPlugin : JadxPlugin {
     }
 
     override fun init(init: JadxPluginContext) {
-        LOG.info { init.args }
-        LOG.info { init.args.inputFiles }
+        LOG.debug { init.args }
+        LOG.debug { init.args.inputFiles }
 
         val sourceApk = init.args.inputFiles.firstOrNull()
         if (sourceApk == null || !sourceApk.exists()) {
