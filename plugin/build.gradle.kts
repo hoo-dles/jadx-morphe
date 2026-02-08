@@ -10,13 +10,14 @@ dependencies {
     val isJadxSnapshot = libs.versions.jadx.toString().endsWith("-SNAPSHOT")
     compileOnly(libs.bundles.jadx) {
         isChanging = isJadxSnapshot
+
     }
+    implementation(libs.flatlaf)
     implementation(libs.flatlaf.extras)
     implementation(libs.rsyntaxtextarea)
     implementation(libs.autocomplete)
 
     implementation(libs.bundles.logging)
-
     implementation(libs.bundles.scripting)
 
     api(libs.bundles.morphe)

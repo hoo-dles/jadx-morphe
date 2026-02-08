@@ -13,7 +13,8 @@ slf4j = "2.0.17"
 logback = "1.5.18"
 
 jadx = "1.5.3"
-flatlaf = "3.6"
+flatlaf = "3.7"
+flatlaf-extras = "3.7"
 rsyntaxtextarea = "3.6.0"
 autocomplete = "3.3.2"
 
@@ -35,7 +36,8 @@ kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serializa
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx" }
 kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinx" }
 
-flatlaf-extras = { module = "com.formdev:flatlaf-extras", version.ref = "flatlaf" }
+flatlaf = { module = "com.formdev:flatlaf", version.ref = "flatlaf" }
+flatlaf-extras = { module = "com.formdev:flatlaf-extras", version.ref = "flatlaf-extras" }
 rsyntaxtextarea = { module = "com.fifesoft:rsyntaxtextarea", version.ref = "rsyntaxtextarea" }
 autocomplete = { module = "com.fifesoft:autocomplete", version.ref = "autocomplete" }
 
@@ -46,7 +48,7 @@ logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "lo
 jadx-core = { module = "io.github.skylot:jadx-core", version.ref = "jadx" }
 jadx-gui = { module = "io.github.skylot:jadx-gui", version.ref = "jadx" }
 
-morphe-patcher = { group = "app.morphe", name = "morphe-patcher", version.ref="morphe-patcher"}
+morphe-patcher = { module = "app.morphe:morphe-patcher", version.ref="morphe-patcher"}
 multidexlib2 = { module = "app.morphe:multidexlib2", version.ref = "multidexlib2" }
 smali = { module = "com.github.iBotPeaches.smali:smali", version.ref = "smali" }
 xpp3 = { module = "xpp3:xpp3", version.ref = "xpp3" }

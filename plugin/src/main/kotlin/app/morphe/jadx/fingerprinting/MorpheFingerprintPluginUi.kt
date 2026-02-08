@@ -352,6 +352,7 @@ object MorpheFingerprintPluginUi {
             })
             frame.setSize(800, 600)
             frame.setLocationRelativeTo(guiContext.mainFrame) // Center relative to main frame
+            frame.iconImage = inlineSvgIcon(MORPHE_ICON).image
 
             // Main panel with BorderLayout contains the CodePanel in the CENTER region.
             val mainPanel = JPanel(BorderLayout())
