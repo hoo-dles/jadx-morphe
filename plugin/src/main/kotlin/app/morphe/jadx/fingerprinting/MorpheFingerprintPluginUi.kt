@@ -1,14 +1,11 @@
 package app.morphe.jadx.fingerprinting
 
-import app.morphe.jadx.fingerprinting.solver.Solver
 import app.morphe.patcher.Fingerprint
 import com.android.tools.smali.dexlib2.analysis.reflection.util.ReflectionUtils
 import com.formdev.flatlaf.extras.FlatSVGIcon
 import io.github.oshai.kotlinlogging.KotlinLogging
-import jadx.api.metadata.ICodeNodeRef
 import jadx.api.plugins.JadxPluginContext
 import jadx.api.plugins.gui.JadxGuiContext
-import jadx.core.dex.nodes.MethodNode
 import jadx.gui.ui.MainWindow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -24,19 +21,14 @@ import kotlin.script.experimental.api.ResultWithDiagnostics
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.measureTime
 
-const val COPY_ICON = "icons/copy.svg"
 const val MORPHE_ICON = "icons/morphe.svg"
-//const val NEXT_ICON = "icons/next-arrow.svg"
 const val PLAY_ARROW = "icons/play-arrow.svg"
-//const val PREV_ARROW = "icons/prev-arrow.svg"
 
 object MorpheFingerprintPluginUi {
     private const val FRAME_NAME = "Morphe Fingerprint Evaluator"
     private const val MINIMAL_SETS_FRAME_NAME = "Fingerprinting Results"
 
     private val LOG = KotlinLogging.logger("${MorpheFingerprintPlugin.ID}/ui")
-//    private var matchedMethods = linkedSetOf<Method>()
-//    private var navigationIndex = 0
     private lateinit var context: JadxPluginContext
     private lateinit var guiContext: JadxGuiContext
 
@@ -52,8 +44,6 @@ object MorpheFingerprintPluginUi {
                 JFrame.getFrames().filter { it.title == FRAME_NAME }.forEach { it.dispose() }
                 JFrame.getFrames().filter { it.title == MINIMAL_SETS_FRAME_NAME }.forEach { it.dispose() }
                 addToolbarButton()
-                // TODO: Update Solver to generate Morphe-style fingerprints
-                // addCopyFingerprintAction()
             } catch (e: Exception) {
                 LOG.error(e) { "Failed to initialize UI" }
                 JOptionPane.showMessageDialog(
@@ -64,206 +54,6 @@ object MorpheFingerprintPluginUi {
                 )
             }
         }
-    }
-
-    fun isCopyFingerprintActionEnabled(codeNodeRef: ICodeNodeRef): Boolean {
-        return codeNodeRef is MethodNode
-    }
-
-    fun copyFingerprintAction(codeNodeRef: ICodeNodeRef) {
-        try {
-            val methodNode = codeNodeRef as MethodNode
-            val methodInfo = methodNode.methodInfo
-            LOG.info { "Generating fingerprints for method: ${methodInfo.shortId}" }
-            val uniqueMethodId = "${ReflectionUtils.javaToDexName(methodNode.parentClass.rawName)}${methodInfo.shortId}"
-            try {
-                val minimalSets = Solver.getMinimalDistinguishingFeatures(uniqueMethodId)
-                if (minimalSets.isEmpty()) {
-                    LOG.warn { "No feature sets found for method $uniqueMethodId" }
-                    JOptionPane.showMessageDialog(
-                        guiContext.mainFrame,
-                        "Could not find any distinguishing feature sets for this method.",
-                        "No Sets Found",
-                        JOptionPane.WARNING_MESSAGE
-                    )
-                    return
-                }
-                // Show the window with all minimal sets
-                showMinimalSetsWindow(minimalSets, methodNode)
-
-            } catch (e: IllegalStateException) {
-                LOG.error(e) { "Failed to find feature sets for $uniqueMethodId" }
-                JOptionPane.showMessageDialog(
-                    guiContext.mainFrame,
-                    "Failed to generate fingerprints: ${e.message}",
-                    "Error",
-                    JOptionPane.ERROR_MESSAGE
-                )
-            } catch (e: Exception) {
-                LOG.error(e) { "Failed during fingerprint generation or display for $uniqueMethodId" }
-                JOptionPane.showMessageDialog(
-                    guiContext.mainFrame,
-                    "An unexpected error occurred: ${e.message}",
-                    "Error",
-                    JOptionPane.ERROR_MESSAGE
-                )
-            }
-        } catch (e: Exception) {
-            LOG.error(e) { "Failed to process method node for fingerprinting" }
-            JOptionPane.showMessageDialog(
-                guiContext.mainFrame,
-                "Failed to get method details: ${e.message}",
-                "Error",
-                JOptionPane.ERROR_MESSAGE
-            )
-        }
-    }
-
-    private fun showMinimalSetsWindow(
-        minimalSets: List<List<String>>, methodNode: MethodNode
-    ) {
-        val methodShortId = methodNode.methodInfo.shortId
-        val uniqueMethodId = "${ReflectionUtils.javaToDexName(methodNode.parentClass.rawName)}${methodShortId}"
-        val methodFeatures = Solver.getMethodFeatures(uniqueMethodId)
-        val fullMethodFingerprint = Solver.featuresToFingerprintString(methodFeatures)
-        SwingUtilities.invokeLater {
-            // Close existing window if open
-            JFrame.getFrames().find { it.title == MINIMAL_SETS_FRAME_NAME }?.dispose()
-
-            val frame = JFrame(MINIMAL_SETS_FRAME_NAME)
-            frame.defaultCloseOperation = JFrame.DISPOSE_ON_CLOSE
-            frame.setSize(700, 500)
-            frame.setLocationRelativeTo(guiContext.mainFrame)
-
-            val mainPanel = JPanel(GridBagLayout()) // Changed layout
-            mainPanel.border = BorderFactory.createEmptyBorder(10, 10, 10, 10)
-
-            val gbc = GridBagConstraints()
-            gbc.gridx = 0 // All components in the first column
-            gbc.gridy = GridBagConstraints.RELATIVE // Place components below each other
-            gbc.weightx = 1.0 // Allow horizontal stretching
-            gbc.fill = GridBagConstraints.HORIZONTAL // Fill available horizontal space
-            gbc.anchor = GridBagConstraints.NORTHWEST // Anchor to top-left
-            gbc.insets = Insets(0, 0, 0, 0) // Default spacing
-
-            val titleLabel =
-                JTextArea("Found ${minimalSets.size} fingerprint(s) for method : $uniqueMethodId")
-            titleLabel.isEditable = false
-            titleLabel.lineWrap = true
-            titleLabel.wrapStyleWord = true
-            titleLabel.preferredSize = Dimension(0, 50)
-
-            gbc.insets = Insets(0, 0, 10, 0) // Add bottom margin
-            mainPanel.add(titleLabel, gbc)
-
-            val fullFingerprintPanel = JPanel(BorderLayout(5, 5))
-            fullFingerprintPanel.border = BorderFactory.createCompoundBorder(
-                BorderFactory.createTitledBorder("Full Method Fingerprint | ${methodFeatures.size} feature(s) "),
-                BorderFactory.createEmptyBorder(5, 5, 5, 5)
-            )
-
-            val fullTextArea = JTextArea(fullMethodFingerprint)
-            fullTextArea.isEditable = false
-            fullTextArea.border = BorderFactory.createEmptyBorder(5, 5, 5, 5)
-            fullTextArea.tabSize = 2
-
-            val fullCopyButton = JButton(null, inlineSvgIcon(COPY_ICON))
-            fullCopyButton.toolTipText = "Copy the full method fingerprint to clipboard"
-            fullCopyButton.addActionListener {
-                try {
-                    guiContext.copyToClipboard(fullMethodFingerprint)
-                    LOG.info { "Copied full method fingerprint to clipboard." }
-                    fullCopyButton.isEnabled = false
-                    Timer(1500) {
-                        fullCopyButton.isEnabled = true
-                    }.apply { isRepeats = false }.start()
-                } catch (e: Exception) {
-                    LOG.error(e) { "Failed to copy full fingerprint string to clipboard" }
-                    JOptionPane.showMessageDialog(
-                        frame,
-                        "Failed to copy to clipboard: ${e.message}",
-                        "Copy Error",
-                        JOptionPane.ERROR_MESSAGE
-                    )
-                }
-            }
-
-            fullFingerprintPanel.add(fullTextArea, BorderLayout.CENTER)
-            fullFingerprintPanel.add(fullCopyButton, BorderLayout.EAST)
-
-            gbc.insets = Insets(0, 0, 15, 0)
-            mainPanel.add(fullFingerprintPanel, gbc)
-            mainPanel.add(Box.createRigidArea(Dimension(0, 15)))
-
-            minimalSets.forEachIndexed { index, featureSet ->
-                val fingerprintString = try {
-                    Solver.featuresToFingerprintString(featureSet)
-                } catch (e: Exception) {
-                    LOG.error(e) { "Failed to convert feature set to string: $featureSet" }
-                    "Error generating fingerprint string: ${e.message}"
-                }
-
-                val setPanel = JPanel(BorderLayout(5, 5)) // Panel for each set
-                setPanel.border = BorderFactory.createCompoundBorder(
-                    BorderFactory.createTitledBorder("Fingerprint ${index + 1} | ${featureSet.size} feature(s) "),
-                    BorderFactory.createEmptyBorder(5, 5, 5, 5)
-                )
-
-                val textArea = JTextArea(fingerprintString)
-                textArea.isEditable = false
-                textArea.border = BorderFactory.createEmptyBorder(5, 5, 5, 5)
-                textArea.tabSize = 2
-
-                val copyButton = JButton(null, inlineSvgIcon(COPY_ICON))
-                copyButton.toolTipText = "Copy this fingerprint to clipboard"
-                copyButton.addActionListener {
-                    try {
-                        guiContext.copyToClipboard(fingerprintString)
-                        LOG.info { "Copied fingerprint set ${index + 1} to clipboard." }
-                        copyButton.isEnabled = false
-                        Timer(1500) {
-                            copyButton.isEnabled = true
-                        }.apply { isRepeats = false }.start()
-
-                    } catch (e: Exception) {
-                        LOG.error(e) { "Failed to copy fingerprint string to clipboard" }
-                        JOptionPane.showMessageDialog(
-                            frame,
-                            "Failed to copy to clipboard: ${e.message}",
-                            "Copy Error",
-                            JOptionPane.ERROR_MESSAGE
-                        )
-                    }
-                }
-
-                setPanel.add(textArea, BorderLayout.CENTER)
-                setPanel.add(copyButton, BorderLayout.EAST)
-
-                gbc.insets = Insets(0, 0, 10, 0)
-                mainPanel.add(setPanel, gbc)
-            }
-            gbc.weighty = 1.0
-            gbc.fill = GridBagConstraints.VERTICAL
-            mainPanel.add(Box.createVerticalGlue(), gbc)
-
-            val containerPanel = JPanel(BorderLayout())
-            containerPanel.add(mainPanel, BorderLayout.NORTH)
-
-            val scrollPane = JScrollPane(containerPanel)
-            scrollPane.verticalScrollBar.unitIncrement = 16
-
-            frame.contentPane.add(scrollPane)
-            frame.isVisible = true
-        }
-    }
-
-    private fun addCopyFingerprintAction() {
-        guiContext.addPopupMenuAction(
-            "Generate Morphe fingerprint",
-            ::isCopyFingerprintActionEnabled,
-            "M",
-            ::copyFingerprintAction
-        )
     }
 
     private fun addToolbarButton() {
@@ -382,17 +172,12 @@ object MorpheFingerprintPluginUi {
             }
 
             val runButton = defaultButton("Run the script", inlineSvgIcon(PLAY_ARROW) as Icon)
-//            val nextButton = defaultButton("Search next", inlineSvgIcon(NEXT_ICON) as Icon).apply { isEnabled = false }
-//            val previousButton = defaultButton("Search previous", inlineSvgIcon(PREV_ARROW) as Icon).apply { isEnabled = false }
-
             val resultLabel = JLabel("Fingerprint result")
             resultLabel.border = BorderFactory.createEmptyBorder(0, 10, 0, 0) // Add padding
 
             upPanel.add(runButton)
             upPanel.add(resultLabel)
 
-//            downPanel.add(previousButton)
-//            downPanel.add(nextButton)
             resultHeaderPanel.add(upPanel)
             resultHeaderPanel.add(downPanel)
             resultPanel.add(resultHeaderPanel, BorderLayout.NORTH)
@@ -409,8 +194,6 @@ object MorpheFingerprintPluginUi {
 
             fun onButtonClick(statusText: String) {
                 runButton.isEnabled = false
-//                nextButton.isEnabled = false
-//                previousButton.isEnabled = false
                 resultContentBox.removeAll()
                 val statusLabel = JLabel(statusText)
                 statusLabel.alignmentX = Component.LEFT_ALIGNMENT
@@ -498,20 +281,10 @@ object MorpheFingerprintPluginUi {
                                             ScriptEvaluation.LOG.error { "Actual value classloader: ${actualValue.javaClass.classLoader}" }
                                             ScriptEvaluation.LOG.error { "Expected Fingerprint classloader: ${Fingerprint::class.java.classLoader}" }
                                         } else {
-//                                            ScriptEvaluation.LOG.info { "Index: $navigationIndex" }
-//                                            ScriptEvaluation.LOG.info { "Current set: $matchedMethods" }
                                             ScriptEvaluation.LOG.debug { "Fingerprint: $actualValue" }
                                             outputBuilder.appendLine("Fingerprint: $actualValue")
 
-//                                            val searchResult = if (navigationIndex in matchedMethods.indices) {
-//                                                ScriptEvaluation.LOG.info { "Index $navigationIndex found in map" }
-//                                                matchedMethods.elementAt(navigationIndex)
-//                                            } else {
-//                                                ScriptEvaluation.LOG.info { "Not found in map: searching" }
-//                                                MorpheResolver.searchFingerprint(actualValue)
-//                                            }
                                             val searchResult = MorpheResolver.searchFingerprint(actualValue)
-
                                             ScriptEvaluation.LOG.info { "Search result $searchResult" }
                                             if (searchResult != null) {
 //                                                matchedMethods.add(searchResult)
@@ -530,7 +303,7 @@ object MorpheFingerprintPluginUi {
                                                     ).replace(
                                                         "$",
                                                         "."
-                                                    ) // Make sure subclass $ is replaced with dot TODO: this might error if the class name has a $ but what can you do
+                                                    )
                                                 )
                                                 outputBuilder.appendLine("javaKlass: $javaKlass")
                                                 val fgMethod =
@@ -558,16 +331,12 @@ object MorpheFingerprintPluginUi {
                                                         }
                                                     }
                                                     resultComponents.add(jumpButton)
-//                                                    nextButton.isEnabled = true
                                                 }
                                             } else {
-//                                                val msg =
-//                                                    if (navigationIndex == 0) "Fingerprint not found in the APK." else "No more results found."
                                                 val msg = "Fingerprint not found in the APK."
                                                 resultComponents.add(createWrappedTextArea(msg))
                                                 outputBuilder.appendLine(msg)
                                                 ScriptEvaluation.LOG.warn { msg }
-//                                                nextButton.isEnabled = false
                                             }
                                         }
                                     }
@@ -592,8 +361,6 @@ object MorpheFingerprintPluginUi {
 
                         resultLabel.text = "Executed in ${executionTime.inWholeMilliseconds.milliseconds}"
                         runButton.isEnabled = true
-//                        previousButton.isEnabled = navigationIndex > 0
-                        // Ensure layout updates are processed
                         resultContentBox.revalidate()
                         resultContentBox.repaint()
                         // Scroll to top if needed
@@ -604,20 +371,8 @@ object MorpheFingerprintPluginUi {
             }
 
             runButton.addActionListener {
-//                matchedMethods = linkedSetOf()
-//                navigationIndex = 0
                 onButtonClick("Evaluating...")
             }
-
-//            nextButton.addActionListener {
-//                navigationIndex++
-//                onButtonClick("Searching next...")
-//            }
-//
-//            previousButton.addActionListener {
-//                navigationIndex--
-//                onButtonClick("Searching previous...")
-//            }
 
             frame.contentPane = mainPanel
             frame.isVisible = true

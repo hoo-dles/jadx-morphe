@@ -1,13 +1,10 @@
 package app.morphe.jadx.fingerprinting
 
-import app.morphe.jadx.fingerprinting.solver.Solver
 import jadx.api.plugins.JadxPlugin
 import jadx.api.plugins.JadxPluginContext
 import jadx.api.plugins.JadxPluginInfo
 import io.github.oshai.kotlinlogging.KotlinLogging
 import jadx.api.plugins.JadxPluginInfoBuilder
-import lanchon.multidexlib2.BasicDexFileNamer
-import lanchon.multidexlib2.MultiDexIO
 
 class MorpheFingerprintPlugin : JadxPlugin {
     companion object {
@@ -34,18 +31,6 @@ class MorpheFingerprintPlugin : JadxPlugin {
             return
         }
         MorpheResolver.createPatcher(sourceApk, init.files().pluginTempDir.toFile())
-
-        MultiDexIO.readDexFile(
-            true,
-            sourceApk,
-            BasicDexFileNamer(),
-            null,
-            null,
-        ).classes.flatMap { classDef ->
-            classDef.methods
-        }.let { allMethods ->
-            Solver.setMethods(allMethods)
-        }
 
         LOG.info { "Morphe fingerprint plugin is enabled" }
         init.guiContext?.let {
