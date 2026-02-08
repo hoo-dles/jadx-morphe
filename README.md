@@ -4,10 +4,14 @@ A plugin for JADX to test Morphe-style fingerprints on-the-fly.
 
 ![Plugin usage](.github/images/usage.png)
 
-> [!WARNING]
-> Unique fingerprint generation is not yet implemented.
-
 Original codebase has been updated to support JADX 1.5.2+ and the Morphe API. All credit goes to [valonsdev](https://github.com/valonsodev/jadx-revanced) for the original work.
+
+> [!NOTE]
+> Missing feature parity from the original project:
+> - Fingerprint match navigation
+>   - *will be re-enabled when the official Morphe patcher allows multiple match functionality*
+> - Unique fingerprint generation
+>   - *if this functionality would be helpful, please open a ticket*
 
 ## Installation
 
