@@ -3,7 +3,6 @@ package app.morphe.jadx.fingerprinting
 import app.morphe.jadx.fingerprinting.solver.Solver
 import app.morphe.patcher.Fingerprint
 import com.android.tools.smali.dexlib2.analysis.reflection.util.ReflectionUtils
-import com.android.tools.smali.dexlib2.iface.Method
 import com.formdev.flatlaf.extras.FlatSVGIcon
 import io.github.oshai.kotlinlogging.KotlinLogging
 import jadx.api.metadata.ICodeNodeRef
@@ -27,17 +26,17 @@ import kotlin.time.measureTime
 
 const val COPY_ICON = "icons/copy.svg"
 const val MORPHE_ICON = "icons/morphe.svg"
-const val NEXT_ICON = "icons/next-arrow.svg"
+//const val NEXT_ICON = "icons/next-arrow.svg"
 const val PLAY_ARROW = "icons/play-arrow.svg"
-const val PREV_ARROW = "icons/prev-arrow.svg"
+//const val PREV_ARROW = "icons/prev-arrow.svg"
 
 object MorpheFingerprintPluginUi {
     private const val FRAME_NAME = "Morphe Fingerprint Evaluator"
     private const val MINIMAL_SETS_FRAME_NAME = "Fingerprinting Results"
 
     private val LOG = KotlinLogging.logger("${MorpheFingerprintPlugin.ID}/ui")
-    private var matchedMethods = linkedSetOf<Method>()
-    private var navigationIndex = 0
+//    private var matchedMethods = linkedSetOf<Method>()
+//    private var navigationIndex = 0
     private lateinit var context: JadxPluginContext
     private lateinit var guiContext: JadxGuiContext
 
@@ -383,8 +382,8 @@ object MorpheFingerprintPluginUi {
             }
 
             val runButton = defaultButton("Run the script", inlineSvgIcon(PLAY_ARROW) as Icon)
-            val nextButton = defaultButton("Search next", inlineSvgIcon(NEXT_ICON) as Icon).apply { isEnabled = false }
-            val previousButton = defaultButton("Search previous", inlineSvgIcon(PREV_ARROW) as Icon).apply { isEnabled = false }
+//            val nextButton = defaultButton("Search next", inlineSvgIcon(NEXT_ICON) as Icon).apply { isEnabled = false }
+//            val previousButton = defaultButton("Search previous", inlineSvgIcon(PREV_ARROW) as Icon).apply { isEnabled = false }
 
             val resultLabel = JLabel("Fingerprint result")
             resultLabel.border = BorderFactory.createEmptyBorder(0, 10, 0, 0) // Add padding
@@ -392,8 +391,8 @@ object MorpheFingerprintPluginUi {
             upPanel.add(runButton)
             upPanel.add(resultLabel)
 
-            downPanel.add(previousButton)
-            downPanel.add(nextButton)
+//            downPanel.add(previousButton)
+//            downPanel.add(nextButton)
             resultHeaderPanel.add(upPanel)
             resultHeaderPanel.add(downPanel)
             resultPanel.add(resultHeaderPanel, BorderLayout.NORTH)
@@ -410,8 +409,8 @@ object MorpheFingerprintPluginUi {
 
             fun onButtonClick(statusText: String) {
                 runButton.isEnabled = false
-                nextButton.isEnabled = false
-                previousButton.isEnabled = false
+//                nextButton.isEnabled = false
+//                previousButton.isEnabled = false
                 resultContentBox.removeAll()
                 val statusLabel = JLabel(statusText)
                 statusLabel.alignmentX = Component.LEFT_ALIGNMENT
@@ -437,7 +436,7 @@ object MorpheFingerprintPluginUi {
                     val outputBuilder = StringBuilder() // For logging or alternative display
 
                     if (evaluationError != null) {
-                        val errorMsg = "Evaluation failed: ${evaluationError!!.message}"
+                        val errorMsg = "Evaluation failed: ${evaluationError.message}"
                         resultComponents.add(createWrappedTextArea(errorMsg))
                         outputBuilder.appendLine(errorMsg)
                         // Optionally add stack trace details
@@ -504,16 +503,18 @@ object MorpheFingerprintPluginUi {
                                             ScriptEvaluation.LOG.debug { "Fingerprint: $actualValue" }
                                             outputBuilder.appendLine("Fingerprint: $actualValue")
 
-                                            val searchResult = if (navigationIndex in matchedMethods.indices) {
-                                                ScriptEvaluation.LOG.info { "Index $navigationIndex found in map" }
-                                                matchedMethods.elementAt(navigationIndex)
-                                            } else {
-                                                ScriptEvaluation.LOG.info { "Not found in map: searching" }
-                                                MorpheResolver.searchFingerprint(actualValue)
-                                            }
+//                                            val searchResult = if (navigationIndex in matchedMethods.indices) {
+//                                                ScriptEvaluation.LOG.info { "Index $navigationIndex found in map" }
+//                                                matchedMethods.elementAt(navigationIndex)
+//                                            } else {
+//                                                ScriptEvaluation.LOG.info { "Not found in map: searching" }
+//                                                MorpheResolver.searchFingerprint(actualValue)
+//                                            }
+                                            val searchResult = MorpheResolver.searchFingerprint(actualValue)
+
                                             ScriptEvaluation.LOG.info { "Search result $searchResult" }
                                             if (searchResult != null) {
-                                                matchedMethods.add(searchResult)
+//                                                matchedMethods.add(searchResult)
                                                 outputBuilder.appendLine("Fingerprint found in APK: ${searchResult.definingClass}")
                                                 outputBuilder.appendLine(
                                                     "originalFullName: ${
@@ -557,15 +558,16 @@ object MorpheFingerprintPluginUi {
                                                         }
                                                     }
                                                     resultComponents.add(jumpButton)
-                                                    nextButton.isEnabled = true
+//                                                    nextButton.isEnabled = true
                                                 }
                                             } else {
-                                                val msg =
-                                                    if (navigationIndex == 0) "Fingerprint not found in the APK." else "No more results found."
+//                                                val msg =
+//                                                    if (navigationIndex == 0) "Fingerprint not found in the APK." else "No more results found."
+                                                val msg = "Fingerprint not found in the APK."
                                                 resultComponents.add(createWrappedTextArea(msg))
                                                 outputBuilder.appendLine(msg)
                                                 ScriptEvaluation.LOG.warn { msg }
-                                                nextButton.isEnabled = false
+//                                                nextButton.isEnabled = false
                                             }
                                         }
                                     }
@@ -590,7 +592,7 @@ object MorpheFingerprintPluginUi {
 
                         resultLabel.text = "Executed in ${executionTime.inWholeMilliseconds.milliseconds}"
                         runButton.isEnabled = true
-                        previousButton.isEnabled = navigationIndex > 0
+//                        previousButton.isEnabled = navigationIndex > 0
                         // Ensure layout updates are processed
                         resultContentBox.revalidate()
                         resultContentBox.repaint()
@@ -602,20 +604,20 @@ object MorpheFingerprintPluginUi {
             }
 
             runButton.addActionListener {
-                matchedMethods = linkedSetOf()
-                navigationIndex = 0
+//                matchedMethods = linkedSetOf()
+//                navigationIndex = 0
                 onButtonClick("Evaluating...")
             }
 
-            nextButton.addActionListener {
-                navigationIndex++
-                onButtonClick("Searching next...")
-            }
-
-            previousButton.addActionListener {
-                navigationIndex--
-                onButtonClick("Searching previous...")
-            }
+//            nextButton.addActionListener {
+//                navigationIndex++
+//                onButtonClick("Searching next...")
+//            }
+//
+//            previousButton.addActionListener {
+//                navigationIndex--
+//                onButtonClick("Searching previous...")
+//            }
 
             frame.contentPane = mainPanel
             frame.isVisible = true
