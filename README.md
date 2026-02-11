@@ -4,15 +4,6 @@ A plugin for JADX to test Morphe-style fingerprints on-the-fly.
 
 ![Plugin usage](.github/images/usage.png)
 
-Original codebase has been updated to support JADX 1.5.2+ and the Morphe API. All credit goes to [valonsdev](https://github.com/valonsodev/jadx-revanced) for the original work.
-
-> [!NOTE]
-> Missing feature parity from the original project:
-> - Fingerprint match navigation
->   - *will be re-enabled when the official Morphe patcher allows multiple match functionality*
-> - Unique fingerprint generation
->   - *if this functionality would be helpful, please open a ticket*
-
 ## Installation
 
 **jadx-gui:**
@@ -33,3 +24,7 @@ Original codebase has been updated to support JADX 1.5.2+ and the Morphe API. Al
 
 1. Clone this repository.
 2. Run `./gradlew plugin:dist` to build the plugin (output is placed in `plugin/build/dist`).
+
+## Credits
+
+Thanks to [valonsdev](https://github.com/valonsodev/jadx-revanced) for their original work.

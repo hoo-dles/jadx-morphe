@@ -1,4 +1,4 @@
-package app.morphe.jadx.fingerprinting.runtime
+package app.morphe.jadx.eval
 
 import kotlin.script.experimental.annotations.KotlinScript
 import kotlin.script.experimental.api.*
@@ -26,7 +26,7 @@ object FingerprintScriptCompilationConfiguration :
         }
         isStandalone(true)
 
-        // forcing compiler to not use modules while building script classpath
+        // Forcing compiler to not use modules while building script classpath
         // because shadow jar remove all modules-info.class (https://github.com/GradleUp/shadow/issues/710)
         compilerOptions.append("-Xjdk-release=1.8")
     })
