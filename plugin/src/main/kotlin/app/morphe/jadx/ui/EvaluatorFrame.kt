@@ -23,7 +23,7 @@ import kotlin.script.experimental.api.EvaluationResult
 import kotlin.script.experimental.api.ResultValue
 import kotlin.script.experimental.api.ResultWithDiagnostics
 
-private const val SEARCH_TEXT = "Evaluate Fingerprint"
+private const val SEARCH_TEXT = "Evaluate"
 
 class EvaluatorFrame(private val context: JadxPluginContext, options: PluginOptions) : JFrame(NAME) {
     companion object {
@@ -32,39 +32,48 @@ class EvaluatorFrame(private val context: JadxPluginContext, options: PluginOpti
 
     private val guiContext = context.guiContext!!
     private val codePanel: CodePanel
-    private val resultLabel: JLabel
+    private val executeLabel: JLabel
+    private val resultsLabel: JLabel
     private val runButton: JButton
     private val resultContentPanel: JPanel
     private val resultScrollPane: JScrollPane
 
     init {
         // Main frame and content panel
-        setSize(800, 500)
-        minimumSize = Dimension(400, 200)
+        setSize(900, 500)
+        minimumSize = Dimension(600, 300)
         setLocationRelativeTo(guiContext.mainFrame)
         iconImage = loadSvg(MORPHE_ICON_PATH).image
         val splitPane = JSplitPane(JSplitPane.HORIZONTAL_SPLIT)
         splitPane.dividerLocation = 550
-        splitPane.resizeWeight = 1.0
+        splitPane.resizeWeight = 0.5
         splitPane.border = BorderFactory.createEmptyBorder(10, 4, 4, 4)
 
         // Code panel
         codePanel = CodePanel(guiContext, options) { onSearch() }
         splitPane.leftComponent = codePanel
-        splitPane.leftComponent.minimumSize = Dimension(300, 200)
+        splitPane.leftComponent.minimumSize = Dimension(250, 300)
 
         // Right panel for actions results
         val rightPanel = JPanel(BorderLayout())
 
         // Upper section of right panel for run button and label
-        val resultHeaderPanel = JPanel(FlowLayout(FlowLayout.LEFT))
-        resultHeaderPanel.border = BorderFactory.createEmptyBorder(0, 10, 10, 0)
+        val resultHeaderPanel = JPanel()
+        resultHeaderPanel.layout = BoxLayout(resultHeaderPanel, BoxLayout.X_AXIS)
+        resultHeaderPanel.border = BorderFactory.createEmptyBorder(0, 10, 10, 10)
+
         runButton = IconButton(loadSvg(PLAY_ARROW_PATH), "Run (Ctrl+Enter)")
         runButton.addActionListener { onSearch() }
         resultHeaderPanel.add(runButton)
-        resultLabel = JLabel(SEARCH_TEXT)
-        resultLabel.border = BorderFactory.createEmptyBorder(0, 6, 0, 0)
-        resultHeaderPanel.add(resultLabel)
+        executeLabel = JLabel(SEARCH_TEXT)
+        executeLabel.border = BorderFactory.createEmptyBorder(0, 6, 0, 0)
+        resultHeaderPanel.add(executeLabel)
+
+        resultHeaderPanel.add(Box.createHorizontalGlue());
+
+        resultsLabel = JLabel()
+        resultHeaderPanel.add(resultsLabel)
+
         rightPanel.add(resultHeaderPanel, BorderLayout.NORTH)
 
         // Evaluation result section
@@ -83,34 +92,42 @@ class EvaluatorFrame(private val context: JadxPluginContext, options: PluginOpti
         if (!visible) {
             codePanel.reset()
             codePanel.requestFocus()
-            resultLabel.text = SEARCH_TEXT
+            executeLabel.text = SEARCH_TEXT
             resultContentPanel.removeAll()
         }
     }
 
     private fun onSearch() {
         runButton.isEnabled = false
-        resultLabel.text = "Searching..."
+        executeLabel.text = "Searching..."
         resultContentPanel.clearAndRepaint()
 
         GlobalScope.launch(Dispatchers.IO) {
-            val resultComponent = try {
+            lateinit var component: Component
+            var methodCount = 0
+            try {
                 val evalResult = ScriptingHost.evaluate(codePanel.text)
                 resultAsFingerprint(evalResult)?.let {
-                    val method = MorpheResolver.matchMethod(it)
-                    generateFingerprintComponent(method)
+                    val methods = MorpheResolver.matchMethods(it)
+                    component = matchesComponent(methods)
+                    methodCount = methods.size
                 } ?: run {
-                    generateNonFingerprintComponent(evalResult)
+                    component = messageComponent(evalResult)
                 }
             } catch (t: Throwable) {
                 Log.error(t) { "Exception while evaluation and matching fingerprint" }
-                TextArea("Evaluation failed:\n    ${t.message}")
+                component = TextArea("Evaluation failed:\n    ${t.message}")
             }
 
             // Switch back to the Event Dispatch Thread (EDT) to update the UI
             withContext(Dispatchers.Swing) {
-                resultContentPanel.add(resultComponent)
-                resultLabel.text = SEARCH_TEXT
+                resultContentPanel.add(component)
+                resultsLabel.text = when (methodCount) {
+                    0 -> ""
+                    1 -> "Found 1 match"
+                    else -> "Found $methodCount matches"
+                }
+                executeLabel.text = SEARCH_TEXT
                 runButton.isEnabled = true
                 // Scroll to top
                 resultScrollPane.verticalScrollBar.value = resultScrollPane.verticalScrollBar.minimum
@@ -124,7 +141,7 @@ class EvaluatorFrame(private val context: JadxPluginContext, options: PluginOpti
             ?.returnValue as? ResultValue.Value)
             ?.value as? Fingerprint
 
-    private fun generateNonFingerprintComponent(result: ResultWithDiagnostics<EvaluationResult>): Component {
+    private fun messageComponent(result: ResultWithDiagnostics<EvaluationResult>): Component {
         val text = when (result) {
             is ResultWithDiagnostics.Failure ->
                 (listOf("Script parsing failed:") + result.reports.map { "    ${it.severity}: ${it.message}" })
@@ -142,29 +159,42 @@ class EvaluatorFrame(private val context: JadxPluginContext, options: PluginOpti
             is ResultValue.Value -> "Script execution returned unexpected type:\n    ${result.type}"
         }
 
-    private fun generateFingerprintComponent(method: Method?): Component {
-        if (method != null) {
-            val javaKlass = context.decompiler.searchJavaClassByOrigFullName(
-                ReflectionUtils.dexToJavaName(method.definingClass)
-                    .replace("$",".")
-            )
-            val javaMethod = javaKlass?.searchMethodByShortId(method.getShortId())
-            javaMethod?.let { jMethod ->
-                val combined = JPanel()
-                combined.layout = BoxLayout(combined, BoxLayout.Y_AXIS)
-                combined.add(TextArea("Fingerprint found at method:\n    ${jMethod.fullName}"))
+    private fun matchesComponent(methods: List<Method>): Component {
+        if (methods.isNotEmpty()) {
+            val resultsPanel = JPanel()
+            resultsPanel.layout = BoxLayout(resultsPanel, BoxLayout.Y_AXIS)
 
-                val jumpButton = JButton("Jump to method")
-                jumpButton.addActionListener {
-                    if (!guiContext.open(jMethod.codeNodeRef)) {
-                        Log.error { "Failed to jump to method: ${jMethod.fullName}" }
+            val matchBlocks = methods.map {
+                val javaKlass = context.decompiler.searchJavaClassByOrigFullName(
+                    ReflectionUtils.dexToJavaName(it.definingClass)
+                        .replace("$",".")
+                )
+                val javaMethod = javaKlass?.searchMethodByShortId(it.getShortId())
+                javaMethod?.let { jMethod ->
+                    val block = JPanel()
+                    block.layout = BoxLayout(block, BoxLayout.Y_AXIS)
+                    block.add(TextArea(jMethod.fullName))
+
+                    val jumpButton = JButton("Jump to method")
+                    jumpButton.addActionListener {
+                        if (!guiContext.open(jMethod.codeNodeRef)) {
+                            Log.error { "Failed to jump to method: ${jMethod.fullName}" }
+                        }
                     }
+                    block.add(jumpButton)
+                    block
                 }
-                combined.add(jumpButton)
-                return combined
             }
+
+            matchBlocks.forEachIndexed { index, block ->
+                resultsPanel.add(block)
+                if (index < matchBlocks.size - 1)
+                    resultsPanel.add(Box.createVerticalStrut(15))
+            }
+
+            return resultsPanel
         }
 
-        return TextArea("Fingerprint not found in the APK")
+        return TextArea("No matches found.")
     }
 }

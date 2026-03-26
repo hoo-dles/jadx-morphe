@@ -30,15 +30,15 @@ object MorpheResolver {
         }
     }
 
-    fun matchMethod(fingerprint: Fingerprint): Method? {
-        var match: Method? = null
+    fun matchMethods(fingerprint: Fingerprint): List<Method> {
+        var matches: List<Method> = emptyList()
         val tempPatch = bytecodePatch(
             name = "Temporary patch for searching fingerprint"
         ) {
             execute {
-                match = fingerprint.originalMethodOrNull
-                if (match != null) Log.info { "Fingerprint matched method: ${match!!.getShortId()}" }
-                else Log.warn { "Fingerprint did not match any method" }
+                matches = fingerprint.matchAllOrNull()?.map { it.originalMethod }.orEmpty()
+                if (matches.isNotEmpty()) Log.info { "Fingerprint matched ${matches.size} methods:${matches.joinToString { "\n\t${it.getShortId()}" }}" }
+                else Log.warn { "Fingerprint did not match any methods" }
             }
         }
 
@@ -63,6 +63,6 @@ object MorpheResolver {
             }
         }
 
-        return match
+        return matches
     }
 }
