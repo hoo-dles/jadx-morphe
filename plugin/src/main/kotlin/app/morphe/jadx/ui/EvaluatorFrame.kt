@@ -93,6 +93,7 @@ class EvaluatorFrame(private val context: JadxPluginContext, options: PluginOpti
             codePanel.reset()
             codePanel.requestFocus()
             executeLabel.text = SEARCH_TEXT
+            resultsLabel.text = ""
             resultContentPanel.removeAll()
         }
     }
