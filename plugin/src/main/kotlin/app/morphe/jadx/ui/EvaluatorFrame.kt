@@ -101,6 +101,7 @@ class EvaluatorFrame(private val context: JadxPluginContext, options: PluginOpti
     private fun onSearch() {
         runButton.isEnabled = false
         executeLabel.text = "Searching..."
+        resultsLabel.text = ""
         resultContentPanel.clearAndRepaint()
 
         GlobalScope.launch(Dispatchers.IO) {
