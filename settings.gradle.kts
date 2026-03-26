@@ -1,16 +1,18 @@
 dependencyResolutionManagement {
     @Suppress("UnstableApiUsage")
     repositories {
+        mavenLocal()
         mavenCentral()
+        google()
         maven {
             url = uri("https://jitpack.io")
             content {
                 includeGroup("com.github.iBotPeaches.smali")
+                includeGroup("com.github.MorpheApp")
             }
         }
         maven {
-            name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/MorpheApp/morphe-patcher")
+            url = uri("https://maven.pkg.github.com/MorpheApp/registry")
             credentials {
                 username = providers.gradleProperty("gpr.user").orNull ?: System.getenv("GITHUB_ACTOR")
                 password = providers.gradleProperty("gpr.key").orNull ?: System.getenv("GITHUB_TOKEN")
