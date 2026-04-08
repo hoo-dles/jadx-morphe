@@ -169,7 +169,6 @@ class EvaluatorFrame(private val context: JadxPluginContext, options: PluginOpti
             val matchBlocks = methods.map {
                 val javaKlass = context.decompiler.searchJavaClassByOrigFullName(
                     ReflectionUtils.dexToJavaName(it.definingClass)
-                        .replace("$",".")
                 )
                 val javaMethod = javaKlass?.searchMethodByShortId(it.getShortId())
                 javaMethod?.let { jMethod ->
