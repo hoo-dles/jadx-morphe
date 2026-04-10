@@ -25,7 +25,7 @@ class Plugin : JadxPlugin {
 
     override fun init(context: JadxPluginContext) {
         val sourceApk = context.args.inputFiles.firstOrNull()
-        if (sourceApk == null || !sourceApk.exists()) {
+        if (sourceApk == null || !sourceApk.exists() || sourceApk.extension != "apk") {
             Log.error { "No APK file found, aborting..." }
             return
         }

@@ -9,6 +9,7 @@ import app.morphe.jadx.ui.components.IconButton
 import app.morphe.jadx.ui.components.TextArea
 import app.morphe.jadx.ui.components.codepanel.CodePanel
 import app.morphe.patcher.Fingerprint
+import app.morphe.patcher.Match
 import com.android.tools.smali.dexlib2.analysis.reflection.util.ReflectionUtils
 import com.android.tools.smali.dexlib2.iface.Method
 import jadx.api.plugins.JadxPluginContext
@@ -106,13 +107,13 @@ class EvaluatorFrame(private val context: JadxPluginContext, options: PluginOpti
 
         GlobalScope.launch(Dispatchers.IO) {
             lateinit var component: Component
-            var methodCount = 0
+            var matchedCount = 0
             try {
                 val evalResult = ScriptingHost.evaluate(codePanel.text)
                 resultAsFingerprint(evalResult)?.let {
-                    val methods = MorpheResolver.matchMethods(it)
-                    component = matchesComponent(methods)
-                    methodCount = methods.size
+                    val matches = MorpheResolver.matches(it)
+                    component = matchesComponent(matches)
+                    matchedCount = matches.size
                 } ?: run {
                     component = messageComponent(evalResult)
                 }
@@ -124,10 +125,10 @@ class EvaluatorFrame(private val context: JadxPluginContext, options: PluginOpti
             // Switch back to the Event Dispatch Thread (EDT) to update the UI
             withContext(Dispatchers.Swing) {
                 resultContentPanel.add(component)
-                resultsLabel.text = when (methodCount) {
+                resultsLabel.text = when (matchedCount) {
                     0 -> ""
                     1 -> "Found 1 match"
-                    else -> "Found $methodCount matches"
+                    else -> "Found $matchedCount matches"
                 }
                 executeLabel.text = SEARCH_TEXT
                 runButton.isEnabled = true
@@ -161,20 +162,38 @@ class EvaluatorFrame(private val context: JadxPluginContext, options: PluginOpti
             is ResultValue.Value -> "Script execution returned unexpected type:\n    ${result.type}"
         }
 
-    private fun matchesComponent(methods: List<Method>): Component {
-        if (methods.isNotEmpty()) {
+    private fun matchesComponent(matches: List<Match>): Component {
+        if (matches.isNotEmpty()) {
             val resultsPanel = JPanel()
             resultsPanel.layout = BoxLayout(resultsPanel, BoxLayout.Y_AXIS)
 
-            val matchBlocks = methods.map {
+            val matchBlocks = matches.map {
                 val javaKlass = context.decompiler.searchJavaClassByOrigFullName(
-                    ReflectionUtils.dexToJavaName(it.definingClass)
+                    ReflectionUtils.dexToJavaName(it.method.definingClass)
                 )
-                val javaMethod = javaKlass?.searchMethodByShortId(it.getShortId())
+                val javaMethod = javaKlass?.searchMethodByShortId(it.method.getShortId())
                 javaMethod?.let { jMethod ->
                     val block = JPanel()
                     block.layout = BoxLayout(block, BoxLayout.Y_AXIS)
-                    block.add(TextArea(jMethod.fullName))
+                    val methodLabel = TextArea(jMethod.fullName, bold = true)
+                    methodLabel.alignmentX = LEFT_ALIGNMENT
+                    block.add(methodLabel)
+
+                    val inset = JPanel()
+                    inset.layout = BoxLayout(inset, BoxLayout.X_AXIS)
+                    inset.alignmentX = LEFT_ALIGNMENT
+                    inset.add(Box.createHorizontalStrut(8))
+                    block.add(inset)
+
+                    val details = JPanel()
+                    details.layout = BoxLayout(details, BoxLayout.Y_AXIS)
+                    inset.add(details)
+
+                    it.instructionMatchesOrNull?.apply {
+                        details.add(TextArea("First instruction: ${first().index}"))
+                        if (size > 1)
+                            details.add(TextArea("Last instruction: ${last().index}", topPadding = 0))
+                    }
 
                     val jumpButton = JButton("Jump to method")
                     jumpButton.addActionListener {
@@ -182,7 +201,8 @@ class EvaluatorFrame(private val context: JadxPluginContext, options: PluginOpti
                             Log.error { "Failed to jump to method: ${jMethod.fullName}" }
                         }
                     }
-                    block.add(jumpButton)
+                    details.add(jumpButton)
+
                     block
                 }
             }

@@ -2,10 +2,10 @@ package app.morphe.jadx.eval
 
 import app.morphe.jadx.Log
 import app.morphe.patcher.Fingerprint
+import app.morphe.patcher.Match
 import app.morphe.patcher.Patcher
 import app.morphe.patcher.PatcherConfig
 import app.morphe.patcher.patch.bytecodePatch
-import com.android.tools.smali.dexlib2.iface.Method
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -30,14 +30,14 @@ object MorpheResolver {
         }
     }
 
-    fun matchMethods(fingerprint: Fingerprint): List<Method> {
-        var matches: List<Method> = emptyList()
+    fun matches(fingerprint: Fingerprint): List<Match> {
+        var matches: List<Match> = emptyList()
         val tempPatch = bytecodePatch(
             name = "Temporary patch for searching fingerprint"
         ) {
             execute {
-                matches = fingerprint.matchAllOrNull()?.map { it.originalMethod }.orEmpty()
-                if (matches.isNotEmpty()) Log.info { "Fingerprint matched ${matches.size} methods:${matches.joinToString { "\n\t${it.getShortId()}" }}" }
+                matches = fingerprint.matchAllOrNull().orEmpty()
+                if (matches.isNotEmpty()) Log.info { "Fingerprint matched ${matches.size} methods:${matches.joinToString { "\n\t${it.method.getShortId()}" }}" }
                 else Log.warn { "Fingerprint did not match any methods" }
             }
         }

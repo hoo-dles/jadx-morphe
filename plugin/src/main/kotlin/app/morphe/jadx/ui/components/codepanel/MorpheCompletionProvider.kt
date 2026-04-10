@@ -71,7 +71,7 @@ object MorpheCompletionProvider: DefaultCompletionProvider() {
         val opcodes = Opcode.entries.map { op -> "Opcode.${op.name.replace('-', '_').uppercase()}"}
         val instrLocations =
             listOf("MatchFirst", "MatchAfterImmediately", "MatchAfterWithin", "MatchAfterAtLeast", "MatchAfterRange")
-                .map { "InstructionLocation.${it}()" }
+                .map { "${it}()" }
 
         val basics = (accessFlags + opcodes + instrLocations)
             .map { keyword -> BasicCompletion(this, keyword) }
