@@ -66,9 +66,12 @@ class GuiPlugin {
 
             val button = JButton(null, loadSvg(MORPHE_ICON_PATH))
             button.name = scriptButtonName
-            button.toolTipText = "Open Morphe Fingerprint Evaluator"
+            button.toolTipText = "Morphe Fingerprint Evaluator"
 
-            button.addActionListener { evaluatorFrame.isVisible = true }
+            button.addActionListener {
+                evaluatorFrame.isVisible = true
+                evaluatorFrame.toFront()
+            }
 
             // Add plugin button to toolbar after preferences
             val preferencesIndex = when (val i = toolbar.components.indexOfFirst {
