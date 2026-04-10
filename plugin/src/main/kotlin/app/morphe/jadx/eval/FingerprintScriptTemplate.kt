@@ -14,7 +14,11 @@ abstract class FingerprintScript
 
 object FingerprintScriptCompilationConfiguration :
     ScriptCompilationConfiguration({
-        defaultImports("app.morphe.patcher.*","com.android.tools.smali.dexlib2.*")
+        defaultImports(
+            "app.morphe.patcher.*",
+            "app.morphe.patcher.InstructionLocation.*",
+            "com.android.tools.smali.dexlib2.*"
+        )
         jvm {
             dependenciesFromClassloader(
                 wholeClasspath = true,
