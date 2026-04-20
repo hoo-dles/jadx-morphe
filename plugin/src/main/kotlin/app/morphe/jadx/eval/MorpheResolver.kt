@@ -37,7 +37,7 @@ object MorpheResolver {
         ) {
             execute {
                 matches = fingerprint.matchAllOrNull().orEmpty()
-                if (matches.isNotEmpty()) Log.info { "Fingerprint matched ${matches.size} methods:${matches.joinToString { "\n\t${it.method.getShortId()}" }}" }
+                if (matches.isNotEmpty()) Log.info { "Fingerprint matched ${matches.size} methods:${matches.joinToString { "\n\t${it.method.definingClass}->${it.method.getShortId()}" }}" }
                 else Log.warn { "Fingerprint did not match any methods" }
             }
         }

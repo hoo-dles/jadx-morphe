@@ -118,7 +118,7 @@ class EvaluatorFrame(private val context: JadxPluginContext, options: PluginOpti
                     component = messageComponent(evalResult)
                 }
             } catch (t: Throwable) {
-                Log.error(t) { "Exception while evaluation and matching fingerprint" }
+                Log.error(t) { "Exception while evaluating and matching fingerprint" }
                 component = TextArea("Evaluation failed:\n    ${t.message}")
             }
 
@@ -168,14 +168,19 @@ class EvaluatorFrame(private val context: JadxPluginContext, options: PluginOpti
             resultsPanel.layout = BoxLayout(resultsPanel, BoxLayout.Y_AXIS)
 
             val matchBlocks = matches.map {
-                val javaKlass = context.decompiler.searchJavaClassByOrigFullName(
-                    ReflectionUtils.dexToJavaName(it.method.definingClass)
-                )
-                val javaMethod = javaKlass?.searchMethodByShortId(it.method.getShortId())
+                val classFQN = ReflectionUtils.dexToJavaName(it.method.definingClass);
+                // context.decompiler.searchJavaClassByOrigFullName is broken and searches aliases instead of the
+                // original identifiers
+                val javaKlass = context.decompiler.classesWithInners.firstOrNull {cls -> cls.rawName == classFQN } ?:
+                    throw Exception("Could not find $classFQN in decompiled class list")
+
+                val javaMethod = javaKlass.searchMethodByShortId(it.method.getShortId())
                 javaMethod?.let { jMethod ->
                     val block = JPanel()
                     block.layout = BoxLayout(block, BoxLayout.Y_AXIS)
-                    val methodLabel = TextArea(jMethod.fullName, bold = true)
+                    // jMethod.fullName does not format inner classes correctly
+                    val fqn = "${jMethod.declaringClass.rawName}.${jMethod.name}"
+                    val methodLabel = TextArea(fqn, bold = true)
                     methodLabel.alignmentX = LEFT_ALIGNMENT
                     block.add(methodLabel)
 
