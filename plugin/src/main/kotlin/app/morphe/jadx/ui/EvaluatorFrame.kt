@@ -207,8 +207,8 @@ class EvaluatorFrame(private val context: JadxPluginContext, options: PluginOpti
                         } else {
                             InstructionHighlighter.highlight(
                                 guiContext.mainFrame as MainWindow,
-                                jMethod,
-                                match.instructionCodeOffsets
+                                jMethod.methodNode.topParentClass,
+                                match
                             )
                         }
                     }
