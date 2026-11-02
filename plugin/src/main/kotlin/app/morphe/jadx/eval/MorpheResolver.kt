@@ -48,9 +48,7 @@ object MorpheResolver {
         val patcher = Patcher(
             PatcherConfig(
                 this.sourceApk,
-                this.temp,
-                null,
-                this.temp.absolutePath,
+                this.temp
             ),
         )
 
