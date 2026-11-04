@@ -2,7 +2,7 @@ package app.morphe.jadx.ui
 
 import app.morphe.jadx.Log
 import app.morphe.jadx.eval.FingerprintMatch
-import app.morphe.jadx.eval.MatchedInstruction
+import app.morphe.jadx.eval.findInstructionPositions
 import jadx.core.dex.nodes.ClassNode
 import jadx.gui.treemodel.JClass
 import jadx.gui.ui.MainWindow
@@ -12,66 +12,50 @@ import java.awt.Color
 import java.awt.Component
 import java.awt.Container
 import java.awt.Rectangle
-import javax.swing.JTabbedPane
+import java.awt.event.ContainerAdapter
+import java.awt.event.ContainerEvent
+import java.awt.event.HierarchyEvent
+import java.awt.event.HierarchyListener
 import javax.swing.SwingUtilities
 import javax.swing.Timer
 import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
 
 /**
- * Highlights matched instructions in the smali view of a class tab.
+ * Highlights matched instructions in the smali views of a class tab.
+ *
+ * The view the user has selected is never changed. All the smali views of the class are
+ * highlighted, and a view that is not showing scrolls to the match once it is shown.
  *
  * This uses jadx GUI internals, so it may need updating when jadx changes.
  */
 object InstructionHighlighter {
-    // Semi-transparent so the text stays readable with light and dark themes.
-    private val HIGHLIGHT_COLOR = Color(255, 210, 0, 70)
     private const val POLL_INTERVAL_MS = 100
     private const val TIMEOUT_MS = 10_000
 
-    // Directives with a body that is not made of instructions.
-    private val BLOCK_DIRECTIVES = listOf(".annotation", ".packed-switch", ".sparse-switch", ".array-data")
-
     private var pollTimer: Timer? = null
-    private var highlightedArea: SmaliArea? = null
-    private var reloadListener: DocumentListener? = null
-    private val highlightTags = mutableListOf<Any>()
+    private var classHighlight: ClassHighlight? = null
 
     /**
      * Must be called on the Swing event thread, after the method was opened.
      */
     fun highlight(mainWindow: MainWindow, topClass: ClassNode, match: FingerprintMatch) {
         pollTimer?.stop()
+        classHighlight?.dispose()
+        classHighlight = null
         if (match.matchedInstructions.isEmpty()) return
 
-        // The class tab and its smali text are loaded in the background, so wait for them.
+        // The class tab is opened in the background, so wait for it.
         val startTime = System.currentTimeMillis()
-        var shownSmaliPane = false
         pollTimer = Timer(POLL_INTERVAL_MS) {
-            var smaliArea: SmaliArea? = null
             try {
                 val classPanel = findClassPanel(mainWindow, topClass)
-                smaliArea = classPanel?.let { findSmaliArea(it) }
-                if (classPanel != null && smaliArea != null) {
-                    if (!shownSmaliPane) {
-                        showArea(classPanel, smaliArea)
-                        shownSmaliPane = true
-                    } else if (smaliArea.isLoaded) {
-                        val positions = findInstructionPositions(smaliArea.text, match)
-                        if (positions != null) {
-                            pollTimer?.stop()
-                            if (positions.isNotEmpty()) startHighlighting(smaliArea, match, positions)
-                            return@Timer
-                        }
-                    }
-                }
-
-                if (System.currentTimeMillis() - startTime > TIMEOUT_MS) {
+                if (classPanel != null) {
                     pollTimer?.stop()
-                    Log.warn {
-                        "Could not find matched instructions of ${match.definingClass}->${match.methodShortId}" +
-                            " in smali view (tab found: ${smaliArea != null}, loaded: ${smaliArea?.isLoaded})"
-                    }
+                    classHighlight = ClassHighlight(classPanel, match).apply { start() }
+                } else if (System.currentTimeMillis() - startTime > TIMEOUT_MS) {
+                    pollTimer?.stop()
+                    Log.warn { "Timed out waiting for class tab of ${match.definingClass}" }
                 }
             } catch (ex: Exception) {
                 pollTimer?.stop()
@@ -84,28 +68,54 @@ object InstructionHighlighter {
         mainWindow.tabbedPane.tabs
             .filterIsInstance<ClassCodeContentPanel>()
             .firstOrNull { (it.node as? JClass)?.cls?.classNode == topClass }
+}
 
-    private fun findSmaliArea(classPanel: ClassCodeContentPanel): SmaliArea? {
-        // Skip the "Smali bytecode" tab, which also uses a SmaliArea.
-        val smaliAreas = classPanel.descendants()
-            .filterIsInstance<SmaliArea>()
-            .filter { !it.isShowingDalvikBytecode }
-            .toList()
+/**
+ * Keeps the smali views of a class tab highlighted, including the views
+ * created when split view is turned on.
+ */
+private class ClassHighlight(
+    private val classPanel: ClassCodeContentPanel,
+    private val match: FingerprintMatch,
+) {
+    private val areaHighlights = mutableMapOf<SmaliArea, AreaHighlight>()
+    private var disposed = false
 
-        // In split view, prefer the pane that is not showing the decompiled Java code.
-        val javaTabbedPane = SwingUtilities.getAncestorOfClass(JTabbedPane::class.java, classPanel.javaCodePanel)
-        return smaliAreas.firstOrNull {
-            SwingUtilities.getAncestorOfClass(JTabbedPane::class.java, it) != javaTabbedPane
-        } ?: smaliAreas.firstOrNull()
+    // Changing split view replaces the content of the class tab, after the event is handled.
+    private val splitViewListener = object : ContainerAdapter() {
+        override fun componentAdded(e: ContainerEvent) {
+            SwingUtilities.invokeLater {
+                try {
+                    if (!disposed) updateAreas()
+                } catch (ex: Exception) {
+                    Log.error(ex) { "Failed to highlight matched instructions after view change" }
+                }
+            }
+        }
     }
 
-    private fun showArea(classPanel: ClassCodeContentPanel, smaliArea: SmaliArea) {
-        val tabbedPane = SwingUtilities.getAncestorOfClass(JTabbedPane::class.java, smaliArea) as? JTabbedPane
-        val tab = tabbedPane?.components?.firstOrNull { SwingUtilities.isDescendingFrom(smaliArea, it) }
-        if (tab != null) {
-            tabbedPane.selectedComponent = tab
-        } else {
-            classPanel.showSmaliPane()
+    fun start() {
+        classPanel.addContainerListener(splitViewListener)
+        updateAreas()
+    }
+
+    fun dispose() {
+        disposed = true
+        classPanel.removeContainerListener(splitViewListener)
+        areaHighlights.values.forEach { it.dispose() }
+        areaHighlights.clear()
+    }
+
+    private fun updateAreas() {
+        // Skip the "Smali bytecode" tabs, which also use a SmaliArea.
+        val areas = classPanel.descendants()
+            .filterIsInstance<SmaliArea>()
+            .filter { !it.isShowingDalvikBytecode }
+            .toSet()
+
+        (areaHighlights.keys - areas).forEach { areaHighlights.remove(it)?.dispose() }
+        (areas - areaHighlights.keys).forEach { area ->
+            areaHighlights[area] = AreaHighlight(area, match).apply { start() }
         }
     }
 
@@ -115,140 +125,132 @@ object InstructionHighlighter {
             components.forEach { yieldAll(it.descendants()) }
         }
     }
+}
 
-    /**
-     * Finds the text positions of the matched instructions, by counting the instruction lines
-     * of the method in the smali text. Each line found is checked against the matched opcode.
-     *
-     * @return The positions, or null if the method is not in the smali text.
-     */
-    private fun findInstructionPositions(smaliText: String, match: FingerprintMatch): List<Int>? {
-        val wanted = match.matchedInstructions.associateBy(MatchedInstruction::index)
-        val lastWantedIndex = wanted.keys.max()
-        val positions = mutableListOf<Int>()
-
-        var inClass = false
-        var inMethod = false
-        var blockEnd: String? = null
-        var instructionIndex = 0
-        var lineStart = 0
-
-        for (line in smaliText.lineSequence()) {
-            val position = lineStart
-            lineStart += line.length + 1
-            val trimmed = line.trim()
-
-            if (!inMethod) {
-                if (trimmed.startsWith(".class ")) {
-                    inClass = trimmed.endsWith(" ${match.definingClass}")
-                } else if (inClass && trimmed.startsWith(".method ") && trimmed.endsWith(" ${match.methodShortId}")) {
-                    inMethod = true
-                }
-                continue
-            }
-
-            if (blockEnd != null) {
-                if (trimmed.startsWith(blockEnd)) blockEnd = null
-                continue
-            }
-            if (trimmed.startsWith(".end method")) break
-
-            val blockDirective = BLOCK_DIRECTIVES.firstOrNull { trimmed.startsWith(it) }
-            if (blockDirective != null) {
-                blockEnd = ".end ${blockDirective.removePrefix(".")}"
-                continue
-            }
-            if (trimmed.isEmpty() || trimmed[0] in ".:#") continue
-
-            wanted[instructionIndex]?.let { instruction ->
-                val lineOpcode = trimmed.substringBefore(' ')
-                if (normalizeOpcode(lineOpcode) == normalizeOpcode(instruction.opcodeName)) {
-                    positions.add(position + line.indexOf(lineOpcode))
-                } else {
-                    Log.warn {
-                        "Smali line of instruction $instructionIndex is $lineOpcode," +
-                            " expected ${instruction.opcodeName}: ${match.definingClass}->${match.methodShortId}"
-                    }
-                }
-            }
-            if (instructionIndex == lastWantedIndex) break
-            instructionIndex++
-        }
-
-        return if (inMethod) positions else null
+/**
+ * Highlights the matched instructions of a single smali view.
+ */
+private class AreaHighlight(
+    private val area: SmaliArea,
+    private val match: FingerprintMatch,
+) {
+    companion object {
+        // Semi-transparent so the text stays readable with light and dark themes.
+        private val HIGHLIGHT_COLOR = Color(255, 210, 0, 70)
+        private const val SCROLL_RETRY_DELAY_MS = 50
+        private const val SCROLL_RETRIES = 20
     }
 
-    private fun normalizeOpcode(name: String) = name.uppercase().replace('-', '_').replace('/', '_')
+    private val highlightTags = mutableListOf<Any>()
+    private var firstPosition: Int? = null
+    private var scrollPending = false
+    private var applyQueued = false
+    private var disposed = false
 
-    private fun startHighlighting(smaliArea: SmaliArea, match: FingerprintMatch, positions: List<Int>) {
-        clearHighlights()
-        highlightedArea = smaliArea
-        applyHighlights(smaliArea, positions)
-
-        // jadx can load the smali text again right after a class tab is opened. Loading replaces
-        // the text and moves the caret to the top, so highlight and scroll again when that happens.
-        var reapplyQueued = false
-        val listener = object : DocumentListener {
-            override fun insertUpdate(e: DocumentEvent) = queueReapply()
-            override fun removeUpdate(e: DocumentEvent) = queueReapply()
-            override fun changedUpdate(e: DocumentEvent) {}
-
-            private fun queueReapply() {
-                if (reapplyQueued) return
-                reapplyQueued = true
-                SwingUtilities.invokeLater {
-                    reapplyQueued = false
-                    try {
-                        if (highlightedArea != smaliArea || !smaliArea.isLoaded) return@invokeLater
-                        findInstructionPositions(smaliArea.text, match)
-                            ?.takeIf { it.isNotEmpty() }
-                            ?.let { applyHighlights(smaliArea, it) }
-                    } catch (ex: Exception) {
-                        Log.error(ex) { "Failed to highlight matched instructions after reload" }
-                    }
-                }
-            }
-        }
-        smaliArea.document.addDocumentListener(listener)
-        reloadListener = listener
+    // jadx can load the smali text again right after a class tab is opened. Loading replaces
+    // the text and moves the caret to the top, so highlight and scroll again when that happens.
+    private val reloadListener = object : DocumentListener {
+        override fun insertUpdate(e: DocumentEvent) = queueApply()
+        override fun removeUpdate(e: DocumentEvent) = queueApply()
+        override fun changedUpdate(e: DocumentEvent) {}
     }
 
-    private fun applyHighlights(smaliArea: SmaliArea, positions: List<Int>) {
-        removeHighlightTags(smaliArea)
-        positions.forEach { position ->
-            highlightTags.add(smaliArea.addLineHighlight(smaliArea.getLineOfOffset(position), HIGHLIGHT_COLOR))
-        }
+    private val showingListener = HierarchyListener { event ->
+        val showingChanged = event.changeFlags and HierarchyEvent.SHOWING_CHANGED.toLong() != 0L
+        if (showingChanged && area.isShowing && scrollPending) scrollToMatch()
+    }
 
-        // Scroll after the pending layout is done, and without moving the caret,
-        // as the current line highlight hides the match highlight.
+    fun start() {
+        area.document.addDocumentListener(reloadListener)
+        area.addHierarchyListener(showingListener)
+        if (area.isLoaded) apply()
+    }
+
+    fun dispose() {
+        disposed = true
+        area.removeHierarchyListener(showingListener)
+        if (!area.isDisposed) {
+            area.document.removeDocumentListener(reloadListener)
+            removeHighlights()
+        }
+    }
+
+    private fun queueApply() {
+        if (applyQueued) return
+        applyQueued = true
         SwingUtilities.invokeLater {
-            val visibleRect = smaliArea.visibleRect
-            smaliArea.modelToView2D(positions.first())?.bounds?.let { matchRect ->
-                smaliArea.scrollRectToVisible(
-                    Rectangle(
-                        visibleRect.x,
-                        matchRect.y - visibleRect.height / 3,
-                        visibleRect.width,
-                        visibleRect.height
-                    )
-                )
+            applyQueued = false
+            try {
+                if (!disposed && area.isLoaded) apply()
+            } catch (ex: Exception) {
+                Log.error(ex) { "Failed to highlight matched instructions after reload" }
             }
         }
     }
 
-    private fun removeHighlightTags(smaliArea: SmaliArea) {
-        if (!smaliArea.isDisposed) {
-            highlightTags.forEach { smaliArea.removeLineHighlight(it) }
+    private fun apply() {
+        val text = area.text
+        val positions = findInstructionPositions(text, match)
+        if (positions == null) {
+            if (text.isNotEmpty()) {
+                Log.warn { "Could not find ${match.definingClass}->${match.methodShortId} in smali view" }
+            }
+            return
         }
+
+        removeHighlights()
+        positions.forEach { position ->
+            highlightTags.add(area.addLineHighlight(area.getLineOfOffset(position), HIGHLIGHT_COLOR))
+        }
+        firstPosition = positions.firstOrNull()
+        scrollPending = firstPosition != null
+
+        // Must run after the scroll to the top that jadx queues when it loads the text.
+        SwingUtilities.invokeLater {
+            try {
+                if (scrollPending) scrollToMatch()
+            } catch (ex: Exception) {
+                Log.error(ex) { "Failed to scroll to matched instructions" }
+            }
+        }
+    }
+
+    private fun removeHighlights() {
+        highlightTags.forEach { area.removeLineHighlight(it) }
         highlightTags.clear()
     }
 
-    private fun clearHighlights() {
-        highlightedArea?.let { area ->
-            removeHighlightTags(area)
-            reloadListener?.let { area.document.removeDocumentListener(it) }
+    /**
+     * Scrolls without moving the caret, as the current line highlight hides the match highlight.
+     * A view that was just shown may not have been laid out yet, so this retries for a short time.
+     */
+    private fun scrollToMatch(retries: Int = SCROLL_RETRIES) {
+        val position = firstPosition
+        if (disposed || position == null || !area.isShowing) return
+
+        val visibleRect = area.visibleRect
+        val matchRect = if (visibleRect.height > 0) area.modelToView2D(position)?.bounds else null
+        if (matchRect != null) {
+            scrollPending = false
+            area.scrollRectToVisible(
+                Rectangle(
+                    visibleRect.x,
+                    matchRect.y - visibleRect.height / 3,
+                    visibleRect.width,
+                    visibleRect.height
+                )
+            )
+        } else if (retries > 0) {
+            Timer(SCROLL_RETRY_DELAY_MS) {
+                try {
+                    scrollToMatch(retries - 1)
+                } catch (ex: Exception) {
+                    Log.error(ex) { "Failed to scroll to matched instructions" }
+                }
+            }.apply {
+                isRepeats = false
+                start()
+            }
         }
-        reloadListener = null
-        highlightedArea = null
     }
 }
